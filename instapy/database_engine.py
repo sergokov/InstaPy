@@ -45,6 +45,56 @@ SQL_CREATE_ACCOUNTS_PROGRESS_TABLE = """
         CONSTRAINT `fk_accountsProgress_profiles1`
         FOREIGN KEY(`profile_id`) REFERENCES `profiles`(`id`));"""
 
+SQL_CREATE_CRAWLED_PROFILE_TABLE = """
+    CREATE TABLE IF NOT EXISTS `crawled_profile` (
+	    `name` VARCHAR NOT NULL, 
+	    `bio` VARCHAR, 
+	    `bio_url` VARCHAR, 
+	    `alias_name` VARCHAR, 
+	    `posts_num` INTEGER, 
+	    `follower` INTEGER, 
+	    `following` INTEGER, 
+	    `is_private` BOOLEAN, 
+	    PRIMARY KEY (`name`), 
+	    CHECK (`is_private` IN (0, 1)));"""
+
+SQL_CREATE_POST_TABLE = """
+    CREATE TABLE IF NOT EXISTS `post` (
+	    `profile_name` VARCHAR, 
+	    `link` VARCHAR NOT NULL, 
+	    `crawling_order` INTEGER NOT NULL, 
+	    `preview_image_url` VARCHAR, 
+	    `image_url` VARCHAR, 
+	    `likes` INTEGER, 
+	    `comments` INTEGER, 
+	    `is_crawled` BOOLEAN NOT NULL, 
+	    PRIMARY KEY (`link`), 
+	    FOREIGN KEY(`profile_name`) REFERENCES `crawled_profile` (`name`), 
+	    CHECK (`is_crawled` IN (0, 1)));"""
+
+
+SQL_CREATE_LAKER_TABLE = """
+    CREATE TABLE IF NOT EXISTS `liker` (
+	    `name` VARCHAR NOT NULL, 
+	    `post_link` VARCHAR NOT NULL, 
+	    PRIMARY KEY (`name`, `post_link`), 
+	    FOREIGN KEY(`post_link`) REFERENCES post (`link`));"""
+
+
+SQL_CREATE_COMMENTER_TABLE = """
+    CREATE TABLE IF NOT EXISTS `commenter` (
+	    `name` VARCHAR NOT NULL, 
+	    `post_link` VARCHAR NOT NULL, 
+	    `comment` VARCHAR NOT NULL, 
+	    PRIMARY KEY (`name`, `post_link`, `comment`), 
+	    FOREIGN KEY(`post_link`) REFERENCES post (`link`));"""
+
+SQL_CREATE_FOLLOWER_TABLE = """
+    CREATE TABLE IF NOT EXISTS `follower` (
+        `profile_name` VARCHAR,
+	    `name` VARCHAR NOT NULL,
+	    `crawling_date` DATETIME DEFAULT (datetime('now','localtime')), 
+	    PRIMARY KEY (`profile_name`, `name`, `crawling_date`));"""
 
 def get_database(make=False):
     address = Settings.database_location
@@ -73,7 +123,13 @@ def create_database(address, logger, name):
                                    "recordActivity",
                                    "followRestriction",
                                    "shareWithPodsRestriction",
-                                   "accountsProgress"])
+                                   "accountsProgress",
+                                   "crawled_profile",
+                                   "post",
+                                   "liker",
+                                   "commenter",
+                                   "follower"
+                                   ])
 
             connection.commit()
 
@@ -103,6 +159,21 @@ def create_tables(cursor, tables):
 
     if "accountsProgress" in tables:
         cursor.execute(SQL_CREATE_ACCOUNTS_PROGRESS_TABLE)
+
+    if "crawled_profile" in tables:
+        cursor.execute(SQL_CREATE_CRAWLED_PROFILE_TABLE)
+
+    if "post" in tables:
+        cursor.execute(SQL_CREATE_POST_TABLE)
+
+    if "liker" in tables:
+        cursor.execute(SQL_CREATE_LAKER_TABLE)
+
+    if "commenter" in tables:
+        cursor.execute(SQL_CREATE_COMMENTER_TABLE)
+
+    if "follower" in tables:
+        cursor.execute(SQL_CREATE_FOLLOWER_TABLE)
 
 
 def verify_database_directories(address):

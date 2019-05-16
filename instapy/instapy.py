@@ -289,7 +289,8 @@ class InstaPy:
         self.logfolder = get_logfolder(self.username, self.multi_logs)
         self.logger = self.get_instapy_logger(self.show_logs)
 
-        get_database(make=True)  # IMPORTANT: think twice before relocating
+        # get_database(make=True)  # IMPORTANT: think twice before relocating
+        get_database()  # IMPORTANT: think twice before relocating
 
         if self.selenium_local_session is True:
             self.set_selenium_local_session()
