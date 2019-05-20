@@ -2,34 +2,28 @@ import random
 import sys
 import sqlite3
 
-from instapy import InstaPy
+from instapy import InstaPy, Settings
 from instapy import smart_run
 from instapy import set_workspace
-from instapy.database_engine import get_database
 
 
 def main():
-    # set_workspace(path="/home/pi/IG/Workspace")
-    set_workspace(path="/home/sergo/InstaPy")
-
     # login credentials
     insta_username = sys.argv[1]
-    insta_password = 'password'
-    # insta_password = sys.argv[2]
-    # target_profile = sys.argv[3]
-    # users_num = sys.argv[4]
-    # crawler_db_path = sys.argv[5]
+    insta_password = sys.argv[2]
+    target_profile = sys.argv[3]
+    users_num = sys.argv[4]
+    workspace_path = sys.argv[5]
 
-    users = ['shampoo_rnd', 'nurdielemes', 'aleksei.pronin19', '_olenka_0806', 'xx1', 'xx2', 'xx3']
+    set_workspace(path=workspace_path)
 
+    target_users = load_users_to_follow(target_profile, users_num)
 
     session = InstaPy(username=insta_username,
                       password=insta_password,
                       headless_browser=True,
                       disable_image_load=True,
                       multi_logs=True)
-
-    target_users = find_users_not_interacted(users)
 
     with smart_run(session):
         session.set_simulation(enabled=True, percentage=80)
@@ -76,31 +70,18 @@ def main():
         session.join_pods()
 
 
-def load_users_to_follow(db_path, users_num):
-    conn = sqlite3.connect(db_path)
+def load_users_to_follow(target_profile, users_num):
+    conn = sqlite3.connect(Settings.database_location)
 
     with conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        sql = "SELECT username FROM followRestriction WHERE profile_id={pr_id} AND username IN ({usr});"\
-            .format(pr_id=id, usr=','.join(map(str, ["\'{}\'".format(user) for user in users])))
+        sql = "SELECT name FROM liker l INNER JOIN post p ON l.post_link = p.link WHERE p.profile_name='{}' " \
+              "AND name NOT IN (SELECT username FROM followRestriction) " \
+              "ORDER BY crawling_order LIMIT {};"\
+            .format(target_profile, users_num)
         cur.execute(sql)
-        users_interacted = [dict(row)['username'] for row in cur.fetchall()]
-        return list(set(users) - set(users_interacted))
-
-
-def find_users_not_interacted(users):
-    db, id = get_database()
-    conn = sqlite3.connect(db)
-
-    with conn:
-        conn.row_factory = sqlite3.Row
-        cur = conn.cursor()
-        sql = "SELECT username FROM followRestriction WHERE profile_id={pr_id} AND username IN ({usr});"\
-            .format(pr_id=id, usr=','.join(map(str, ["\'{}\'".format(user) for user in users])))
-        cur.execute(sql)
-        users_interacted = [dict(row)['username'] for row in cur.fetchall()]
-        return list(set(users) - set(users_interacted))
+        return [dict(row)['name'] for row in cur.fetchall()]
 
 
 if __name__== "__main__":
