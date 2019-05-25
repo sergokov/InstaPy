@@ -41,6 +41,8 @@ def main():
                                         min_followers=5,
                                         min_following=5)
 
+        session.set_skip_users(skip_private=False)
+
         session.set_quota_supervisor(enabled=True,
                                      sleep_after=["likes", "follows", "unfollows", "server_calls_h"],
                                      sleepyhead=True,
