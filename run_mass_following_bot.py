@@ -49,8 +49,8 @@ def main():
                                      stochastic_flow=True,
                                      notify_me=True,
                                      peak_likes=(50, 110),
-                                     peak_follows=(31, 110),
-                                     peak_unfollows=(35, 120),
+                                     peak_follows=(50, 110),
+                                     peak_unfollows=(50, 120),
                                      peak_server_calls=(1000, 3000))
 
         session.set_user_interact(amount=3, randomize=True, percentage=90, media='Photo')
