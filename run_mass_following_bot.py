@@ -48,14 +48,14 @@ def main():
                                      sleepyhead=True,
                                      stochastic_flow=True,
                                      notify_me=True,
-                                     peak_likes=(32, 110),
+                                     peak_likes=(50, 110),
                                      peak_follows=(31, 110),
                                      peak_unfollows=(35, 120),
                                      peak_server_calls=(1000, 3000))
 
-        session.set_user_interact(amount=4, randomize=True, percentage=90, media='Photo')
+        session.set_user_interact(amount=3, randomize=True, percentage=90, media='Photo')
         session.set_do_like(enabled=True, percentage=80)
-        session.set_do_follow(enabled=True, percentage=20, times=1)
+        session.set_do_follow(enabled=True, percentage=40, times=1)
 
         # activities
         session.follow_by_list(target_users, 1, sleep_delay=600, interact=True)
