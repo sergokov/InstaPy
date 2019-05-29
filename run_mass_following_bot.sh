@@ -2,4 +2,4 @@
 
 sleep .$[ ( $RANDOM % 20 ) + 1 ]s
 
-python3 run_mass_following_bot.py sergo.kowalev Maksimsergoi kovarinaaa 3 /home/sergo/InstaPyWorkspace
+python3 run_mass_following_bot.py test_user test_password kovarinaaa 3 /home/sergo/InstaPyWorkspace

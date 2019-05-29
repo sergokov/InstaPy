@@ -59,7 +59,7 @@ SQL_CREATE_CRAWLED_PROFILE_TABLE = """
 	    CHECK (`is_private` IN (0, 1)));"""
 
 SQL_CREATE_POST_TABLE = """
-    CREATE TABLE `post` (
+    CREATE TABLE IF NOT EXISTS `post` (
 	    `profile_name` VARCHAR, 
 	    `link` VARCHAR NOT NULL, 
 	    `crawling_order` INTEGER NOT NULL, 
@@ -74,7 +74,7 @@ SQL_CREATE_POST_TABLE = """
 
 
 SQL_CREATE_LAKER_TABLE = """
-    CREATE TABLE `liker` (
+    CREATE TABLE IF NOT EXISTS `liker` (
 	    `name` VARCHAR NOT NULL, 
 	    `post_link` VARCHAR NOT NULL, 
 	    PRIMARY KEY (`name`, `post_link`), 
@@ -82,12 +82,19 @@ SQL_CREATE_LAKER_TABLE = """
 
 
 SQL_CREATE_COMMENTER_TABLE = """
-    CREATE TABLE `commenter` (
+    CREATE TABLE IF NOT EXISTS `commenter` (
 	    `name` VARCHAR NOT NULL, 
 	    `post_link` VARCHAR NOT NULL, 
 	    `comment` VARCHAR NOT NULL, 
 	    PRIMARY KEY (`name`, `post_link`, `comment`), 
 	    FOREIGN KEY(`post_link`) REFERENCES post (`link`));"""
+
+SQL_CREATE_FOLLOWER_TABLE = """
+    CREATE TABLE IF NOT EXISTS `follower` (
+        `profile_name` VARCHAR,
+	    `name` VARCHAR NOT NULL,
+	    `crawling_date` DATETIME DEFAULT (datetime('now','localtime')), 
+	    PRIMARY KEY (`profile_name`, `name`, `crawling_date`));"""
 
 def get_database(make=False):
     address = Settings.database_location
@@ -120,7 +127,8 @@ def create_database(address, logger, name):
                                    "crawled_profile",
                                    "post",
                                    "liker",
-                                   "commenter"
+                                   "commenter",
+                                   "follower"
                                    ])
 
             connection.commit()
@@ -163,6 +171,9 @@ def create_tables(cursor, tables):
 
     if "commenter" in tables:
         cursor.execute(SQL_CREATE_COMMENTER_TABLE)
+
+    if "follower" in tables:
+        cursor.execute(SQL_CREATE_FOLLOWER_TABLE)
 
 
 def verify_database_directories(address):
