@@ -48,7 +48,7 @@ def main():
                                         potency_ratio=None,
                                         delimit_by_numbers=True,
                                         max_followers=3000,
-                                        max_following=1000,
+                                        max_following=2000,
                                         min_followers=5,
                                         min_following=5)
 
