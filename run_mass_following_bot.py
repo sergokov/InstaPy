@@ -59,7 +59,7 @@ def main():
                                      sleepyhead=True,
                                      stochastic_flow=True,
                                      notify_me=True,
-                                     peak_likes=(50, 110),
+                                     peak_likes=(100, 150),
                                      peak_follows=(50, 110),
                                      peak_unfollows=(50, 120),
                                      peak_server_calls=(1000, 3000))
@@ -68,7 +68,7 @@ def main():
         session.set_do_like(enabled=True, percentage=80)
         session.set_do_comment(enabled=True, percentage=25)
         session.set_comments(comments)
-        session.set_do_follow(enabled=True, percentage=40, times=1)
+        session.set_do_follow(enabled=True, percentage=50, times=1)
 
         # activities
         session.follow_by_list(target_users, 1, sleep_delay=600, interact=True)
