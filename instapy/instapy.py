@@ -12,11 +12,14 @@ import json
 import requests
 from selenium import webdriver
 from selenium.webdriver import DesiredCapabilities
-from pyvirtualdisplay import Display
 import logging
 from contextlib import contextmanager
 from copy import deepcopy
 import unicodedata
+try:
+    from pyvirtualdisplay import Display
+except ModuleNotFoundError:
+    pass
 
 # import InstaPy modules
 from .clarifai_util import check_image
@@ -76,9 +79,14 @@ from .browser import set_selenium_local_session
 from .browser import close_browser
 from .file_manager import get_workspace
 from .file_manager import get_logfolder
+
+from .pods_util import group_posts
 from .pods_util import get_recent_posts_from_pods
 from .pods_util import share_my_post_with_pods
 from .pods_util import share_with_pods_restriction
+from .pods_util import comment_restriction
+
+from .xpath import read_xpath
 
 # import exceptions
 from selenium.common.exceptions import NoSuchElementException
@@ -129,10 +137,14 @@ class InstaPy:
             raise InstaPyError(
                 "Oh no! I don't have a workspace to work at :'(")
 
+        # virtual display to hide browser (not supported on Windows)
         self.nogui = nogui
-        if nogui:
-            self.display = Display(visible=0, size=(800, 600))
-            self.display.start()
+        if self.nogui:
+            if not platform.startswith('win32'):
+                self.display = Display(visible=0, size=(800, 600))
+                self.display.start()
+            else:
+                raise InstaPyError("The 'nogui' parameter isn't supported on Windows.")
 
         self.browser = None
         self.headless_browser = headless_browser
@@ -188,6 +200,7 @@ class InstaPy:
 
         self.follow_times = 1
         self.share_times = 1
+        self.comment_times = 1
         self.do_follow = False
         self.follow_percentage = 0
         self.dont_include = set()
@@ -270,6 +283,7 @@ class InstaPy:
                                 "unfollows": 4}}
 
         self.allowed_pod_topics = ['general', 'beauty', 'food', 'travel', 'sports', 'entertainment']
+        self.allowed_pod_engagement_modes = ['light', 'normal', 'heavy']
 
         # stores the features' name which are being used by other features
         self.internal_usage = {}
@@ -702,19 +716,30 @@ class InstaPy:
 
         return self
 
-    def set_mandatory_language(self, enabled=False, character_set='LATIN'):
+    def set_mandatory_language(self, enabled=False, character_set=['LATIN']):
         """Restrict the description of the image to a character set"""
         if self.aborting:
             return self
 
-        if (character_set not in ['LATIN', 'GREEK', 'CYRILLIC', 'ARABIC',
-                                  'HEBREW', 'CJK', 'HANGUL', 'HIRAGANA',
-                                  'KATAKANA', 'THAI']):
-            self.logger.warning('Unkown character set! Treating as "LATIN".')
-            character_set = 'LATIN'
+        char_set = []
 
+        if not isinstance(character_set, list):
+            character_set = [character_set]
+        
+        for chr_set in character_set:
+            if (chr_set not in ['LATIN', 'GREEK', 'CYRILLIC', 'ARABIC',
+                                      'HEBREW', 'CJK', 'HANGUL', 'HIRAGANA',
+                                      'KATAKANA', 'THAI', 'MATHEMATICAL']):
+                self.logger.warning('Unkown character set! Treating as "LATIN".')
+                ch_set_name = 'LATIN'
+            else:
+                ch_set_name = chr_set
+                
+            if ch_set_name not in char_set:
+                char_set.append(ch_set_name)
+                
         self.mandatory_language = enabled
-        self.mandatory_character = character_set
+        self.mandatory_character = char_set
 
         return self
 
@@ -1366,7 +1391,8 @@ class InstaPy:
                                                      user_name,
                                                      self.blacklist,
                                                      self.logger,
-                                                     self.logfolder)
+                                                     self.logfolder,
+                                                     liked_img)
 
                         if like_state is True:
                             liked_img += 1
@@ -1454,6 +1480,9 @@ class InstaPy:
 
                         elif msg == "already liked":
                             already_liked += 1
+
+                        elif msg == "block on likes":
+                            break
 
                         elif msg == "jumped":
                             # will break the loop after certain consecutive
@@ -1698,10 +1727,10 @@ class InstaPy:
         not_valid_users = 0
 
         # if smart hashtag is enabled
-        if use_smart_hashtags is True and self.smart_hashtags is not []:
+        if use_smart_hashtags is True and self.smart_hashtags != []:
             self.logger.info('Using smart hashtags')
             tags = self.smart_hashtags
-        elif use_smart_location_hashtags is True and self.smart_location_hashtags is not []:
+        elif use_smart_location_hashtags is True and self.smart_location_hashtags != []:
             self.logger.info('Using smart location hashtags')
             tags = self.smart_location_hashtags
 
@@ -1779,7 +1808,8 @@ class InstaPy:
                                                      user_name,
                                                      self.blacklist,
                                                      self.logger,
-                                                     self.logfolder)
+                                                     self.logfolder,
+                                                     liked_img)
 
                         if like_state is True:
                             liked_img += 1
@@ -1879,6 +1909,9 @@ class InstaPy:
 
                         elif msg == "already liked":
                             already_liked += 1
+
+                        elif msg == "block on likes":
+                            break
 
                         elif msg == "jumped":
                             # will break the loop after certain consecutive
@@ -2043,7 +2076,8 @@ class InstaPy:
                                                      user_name,
                                                      self.blacklist,
                                                      self.logger,
-                                                     self.logfolder)
+                                                     self.logfolder,
+                                                     total_liked_img)
                         if like_state is True:
                             total_liked_img += 1
                             liked_img += 1
@@ -2104,6 +2138,9 @@ class InstaPy:
 
                         elif msg == "already liked":
                             already_liked += 1
+
+                        elif msg == "block on likes":
+                            break
 
                         elif msg == "jumped":
                             # will break the loop after certain consecutive
@@ -2310,7 +2347,8 @@ class InstaPy:
                                                          user_name,
                                                          self.blacklist,
                                                          self.logger,
-                                                         self.logfolder)
+                                                         self.logfolder,
+                                                         total_liked_img)
                             if like_state is True:
                                 total_liked_img += 1
                                 liked_img += 1
@@ -2368,6 +2406,9 @@ class InstaPy:
 
                             elif msg == "already liked":
                                 already_liked += 1
+
+                            elif msg == "block on likes":
+                                break
 
                             elif msg == "jumped":
                                 # will break the loop after certain
@@ -2604,7 +2645,8 @@ class InstaPy:
                                                          user_name,
                                                          self.blacklist,
                                                          self.logger,
-                                                         self.logfolder)
+                                                         self.logfolder,
+                                                         total_liked_img)
                             if like_state is True:
                                 total_liked_img += 1
                                 liked_img += 1
@@ -2669,6 +2711,9 @@ class InstaPy:
 
                             elif msg == "already liked":
                                 already_liked += 1
+
+                            elif msg == "block on likes":
+                                break
 
                             elif msg == "jumped":
                                 # will break the loop after certain
@@ -2744,7 +2789,7 @@ class InstaPy:
         try:
             if not url:
                 urls = self.browser.find_elements_by_xpath(
-                    "//main//article//div//div[1]//div[1]//a[1]")
+                    read_xpath(self.__class__.__name__,"main_article"))
                 url = urls[0].get_attribute("href")
                 self.logger.info("new url {}".format(url))
             tags = get_tags(self.browser, url)
@@ -3677,7 +3722,8 @@ class InstaPy:
                                                              user_name,
                                                              self.blacklist,
                                                              self.logger,
-                                                             self.logfolder)
+                                                             self.logfolder,
+                                                             liked_img)
 
                                 if like_state is True:
                                     liked_img += 1
@@ -3789,6 +3835,9 @@ class InstaPy:
 
                                 elif msg == "already liked":
                                     already_liked += 1
+
+                                elif msg == "block on likes":
+                                    break
 
                                 elif msg == "jumped":
                                     # will break the loop after
@@ -4076,7 +4125,7 @@ class InstaPy:
         Settings.InstaPy_is_running = False
         close_browser(self.browser, threaded_session, self.logger)
 
-        with interruption_handler():
+        with interruption_handler(threaded=threaded_session):
             # close virtual display
             if self.nogui:
                 self.display.stop()
@@ -4225,10 +4274,10 @@ class InstaPy:
         not_valid_users = 0
 
         # if smart hashtag is enabled
-        if use_smart_hashtags is True and self.smart_hashtags is not []:
+        if use_smart_hashtags is True and self.smart_hashtags != []:
             self.logger.info('Using smart hashtags')
             tags = self.smart_hashtags
-        elif use_smart_location_hashtags is True and self.smart_location_hashtags is not []:
+        elif use_smart_location_hashtags is True and self.smart_location_hashtags != []:
             self.logger.info('Using smart location hashtags')
             tags = self.smart_location_hashtags
 
@@ -4424,7 +4473,8 @@ class InstaPy:
                                                  user_name,
                                                  self.blacklist,
                                                  self.logger,
-                                                 self.logfolder)
+                                                 self.logfolder,
+                                                 liked_img)
 
                     if like_state is True:
                         liked_img += 1
@@ -4521,6 +4571,9 @@ class InstaPy:
 
                     elif msg == "already liked":
                         already_liked += 1
+
+                    elif msg == "block on likes":
+                        break
 
                     elif msg == "jumped":
                         # will break the loop after certain consecutive jumps
@@ -4834,7 +4887,8 @@ class InstaPy:
          Like comments of people on posts, reply to them
         and also interact with those commenters
         """
-
+        if self.aborting:
+            return self
         message = "Starting to interact by comments.."
         highlight_print(self.username, message, "feature", "info", self.logger)
 
@@ -4981,13 +5035,17 @@ class InstaPy:
                                                    user_name,
                                                    self.blacklist,
                                                    self.logger,
-                                                   self.logfolder)
+                                                   self.logfolder,
+                                                   self.liked_img)
                 if image_like_state is True:
                     like_failures_tracker["consequent"]["post_likes"] = 0
                     self.liked_img += 1
 
                 elif msg == "already liked":
                     self.already_liked += 1
+
+                elif msg == "block on likes":
+                    break
 
                 else:
                     self.logger.info(
@@ -5156,8 +5214,8 @@ class InstaPy:
             return self.check_letters[uchr]
         except KeyError:
             return self.check_letters.setdefault(uchr,
-                                                 self.mandatory_character in
-                                                 unicodedata.name(uchr))
+                                                any(mandatory_char in unicodedata.name(
+                                                uchr) for mandatory_char in self.mandatory_character))
 
     def run_time(self):
         """ Get the time session lasted in seconds """
@@ -5215,10 +5273,14 @@ class InstaPy:
 
         return self
 
-    def join_pods(self, topic='general'):
+    def join_pods(self, topic='general', engagement_mode='normal'):
         """ Join pods """
         if topic not in self.allowed_pod_topics:
             self.logger.error('You have entered an invalid topic for pods, allowed topics are : {}. Exiting...'.format(self.allowed_pod_topics))
+            return self
+
+        if engagement_mode not in self.allowed_pod_engagement_modes:
+            self.logger.error('You have entered an invalid engagement_mode for pods, allowed engagement_modes are : {}. Exiting...'.format(self.allowed_pod_engagement_modes))
             return self
 
         if self.comments is not None and len(self.comments) < 10:
@@ -5228,8 +5290,9 @@ class InstaPy:
         user_link = 'https://www.instagram.com/{}/'.format(self.username)
         web_address_navigator(self.browser, user_link)
         try:
-            pod_post_ids = get_recent_posts_from_pods(topic, self.logger)
-            self.logger.info("Downloaded pod_post_ids : {}".format(pod_post_ids))
+            pod_posts = get_recent_posts_from_pods(topic, self.logger)
+            self.logger.info("Downloaded pod_posts : {}".format(pod_posts))
+
             sleep(2)
             post_link_elems = self.browser.find_elements_by_xpath("//a[contains(@href, '/p/')]")
             post_links = []
@@ -5258,7 +5321,7 @@ class InstaPy:
                                             self.logger)
                     if datetime.now() - post_datetime < timedelta(hours=12, minutes=30) and not share_restricted:
                         my_recent_post_ids.append(postid)
-                        if share_my_post_with_pods(postid, topic, self.logger):
+                        if share_my_post_with_pods(postid, topic, engagement_mode, self.logger):
                             share_with_pods_restriction("write", postid, None, self.logger)
                 except Exception as err:
                     self.logger.error("Failed for {} with Error {}".format(post_link, err))
@@ -5270,69 +5333,94 @@ class InstaPy:
                 self.logger.info("I don't have any recent post, so I will just help a few pod posts and move on.")
                 nposts = 40
 
-            if len(pod_post_ids) <= nposts:
-                pod_post_ids = pod_post_ids
+            if len(pod_posts) <= nposts:
+                pod_posts = pod_posts
             else:
-                pod_post_ids = random.sample(pod_post_ids, nposts)
+                pod_posts = random.sample(pod_posts, nposts)
 
-            for pod_post_id in pod_post_ids:
-                try:
-                    post_link = "https://www.instagram.com/p/{}".format(pod_post_id)
-                    web_address_navigator(self.browser, post_link)
+            light_posts, normal_posts, heavy_posts = group_posts(pod_posts, self.logger)
 
-                    inappropriate, user_name, is_video, reason, scope = (
-                        check_link(self.browser,
-                                    post_link,
-                                    self.dont_like,
-                                    self.mandatory_words,
-                                    self.mandatory_language,
-                                    self.is_mandatory_character,
-                                    self.mandatory_character,
-                                    self.check_character_set,
-                                    self.ignore_if_contains,
-                                    self.logger))
+            self.logger.error("light_posts : {} ".format(light_posts))
+            self.logger.error("normal_posts : {} ".format(normal_posts))
+            self.logger.error("heavy_posts : {} ".format(heavy_posts))
 
-                    if user_name != self.username:
-                        follow_state, msg = follow_user(self.browser,
-                                                        "post",
-                                                        self.username,
-                                                        user_name,
-                                                        None,
-                                                        self.blacklist,
-                                                        self.logger,
-                                                        self.logfolder)
-
-                        self.dont_include.add(user_name)
-
-                    if not inappropriate and user_name != self.username:
-                        pods_like_percent = max(80, min(100, self.like_percentage))
-                        pods_comment_percentage = max(80, min(100, self.comment_percentage))
-                        liking = (random.randint(0, 100) <= pods_like_percent)
-                        commenting = (random.randint(0, 100) <= pods_comment_percentage)
-
-                        if liking:
-                            like_state, msg = like_image(self.browser,
-                                                            user_name,
-                                                            self.blacklist,
-                                                            self.logger,
-                                                            self.logfolder)
-
-                        if commenting:
-                            comments = self.fetch_smart_comments(
-                                                            is_video,
-                                                            temp_comments=[])
-
-                            comment_state, msg = comment_image(
-                                                            self.browser,
-                                                            user_name,
-                                                            comments,
-                                                            self.blacklist,
-                                                            self.logger,
-                                                            self.logfolder)
-                except Exception as err:
-                    self.logger.error("Failed for {} with Error {}".format(pod_post_id, err))
+            self.engage_with_posts(light_posts, 10)
+            self.engage_with_posts(normal_posts, 30)
+            self.engage_with_posts(heavy_posts, 90)
 
         except Exception as err:
             self.logger.error(err)
 
         return self
+
+    def engage_with_posts(self, pod_posts, modespecific_comment_percentage):
+        for pod_post in pod_posts:
+            try:
+                pod_post_id = pod_post['postid']
+                post_link = "https://www.instagram.com/p/{}".format(pod_post_id)
+                web_address_navigator(self.browser, post_link)
+
+                inappropriate, user_name, is_video, reason, scope = (
+                    check_link(self.browser,
+                                post_link,
+                                self.dont_like,
+                                self.mandatory_words,
+                                self.mandatory_language,
+                                self.is_mandatory_character,
+                                self.mandatory_character,
+                                self.check_character_set,
+                                self.ignore_if_contains,
+                                self.logger))
+
+                if user_name != self.username:
+                    follow_state, msg = follow_user(self.browser,
+                                                    "post",
+                                                    self.username,
+                                                    user_name,
+                                                    None,
+                                                    self.blacklist,
+                                                    self.logger,
+                                                    self.logfolder)
+
+                    self.dont_include.add(user_name)
+
+                if not inappropriate and user_name != self.username:
+                    pods_like_percent = max(90, min(100, self.like_percentage))
+                    liking = (random.randint(0, 100) <= pods_like_percent)
+                    commenting = (random.randint(0, 100) <= modespecific_comment_percentage)
+
+                    if liking:
+                        like_state, msg = like_image(self.browser,
+                                                        user_name,
+                                                        self.blacklist,
+                                                        self.logger,
+                                                        self.logfolder,
+                                                        self.liked_img)
+                        if like_state is True:
+                            self.liked_img += 1
+
+                        elif msg == "block on likes":
+                            break
+
+                    commenting_restricted = comment_restriction("read", pod_post_id,
+                                            self.comment_times,
+                                            self.logger)
+
+                    if commenting and not commenting_restricted:
+                        comments = self.fetch_smart_comments(
+                                                        is_video,
+                                                        temp_comments=[])
+
+                        comment_state, msg = comment_image(
+                                                        self.browser,
+                                                        user_name,
+                                                        comments,
+                                                        self.blacklist,
+                                                        self.logger,
+                                                        self.logfolder)
+                        if comment_state:
+                            comment_restriction("write", pod_post_id, None, self.logger)
+
+            except Exception as err:
+                self.logger.error("Failed for {} with Error {}".format(pod_post, err))
+
