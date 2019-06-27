@@ -102,6 +102,11 @@ SQL_CREATE_FOLLOWER_TABLE = """
 	    `crawling_date` DATETIME DEFAULT (datetime('now','localtime')), 
 	    PRIMARY KEY (`profile_name`, `name`, `crawling_date`));"""
 
+SQL_CREATE_NOT_VALID_USER_TABLE = """
+    CREATE TABLE IF NOT EXISTS `not_valid_user` (
+	    `name` VARCHAR NOT NULL, 
+	    `details` VARCHAR);"""
+
 def get_database(make=False):
     logger = Settings.logger
     credentials = Settings.profile
@@ -134,7 +139,8 @@ def create_database(address, logger, name):
                                    "post",
                                    "liker",
                                    "commenter",
-                                   "follower"
+                                   "follower",
+                                   "not_valid_user"
                                    ])
 
             connection.commit()
@@ -183,6 +189,9 @@ def create_tables(cursor, tables):
 
     if "follower" in tables:
         cursor.execute(SQL_CREATE_FOLLOWER_TABLE)
+
+    if "not_valid_user" in tables:
+        cursor.execute(SQL_CREATE_NOT_VALID_USER_TABLE)
 
 
 def verify_database_directories(address):

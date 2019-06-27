@@ -1213,7 +1213,25 @@ class InstaPy:
                                                 self.dont_skip_business_categories,
                                                 self.logger,
                                                 self.logfolder)
+
+        if validation is not True:
+            self.save_not_valid_user(user_name, details)
+
         return validation, details
+
+    def save_not_valid_user(self, user_name, details):
+        details = details[details.find(user_name) + len(user_name) + 3:]
+
+        query = "INSERT INTO not_valid_user (name, details) VALUES ('{}', '{}');".format(user_name, details)
+
+        db, id = get_database()
+        import sqlite3
+        connection = sqlite3.connect(db)
+
+        with connection:
+            connection.row_factory = sqlite3.Row
+            cursor = connection.cursor()
+            cursor.execute(query)
 
     def fetch_smart_comments(self, is_video, temp_comments):
         if temp_comments:

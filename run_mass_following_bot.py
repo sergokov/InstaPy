@@ -32,7 +32,7 @@ def main():
 
     session = InstaPy(username=insta_username,
                       password=insta_password,
-                      headless_browser=True,
+                      headless_browser=False,
                       disable_image_load=True,
                       multi_logs=True)
 
@@ -91,9 +91,10 @@ def load_users_to_follow(target_profile, users_num):
     with conn:
         conn.row_factory = sqlite3.Row
         cur = conn.cursor()
-        sql = "SELECT name FROM liker l INNER JOIN post p ON l.post_link = p.link WHERE p.profile_name='{}' " \
-              "AND name NOT IN (SELECT username FROM followRestriction) " \
-              "ORDER BY crawling_order LIMIT {};"\
+        sql = "SELECT l.name FROM liker l INNER JOIN post p ON l.post_link = p.link WHERE p.profile_name='{}' " \
+              "AND l.name NOT IN (SELECT fl.username FROM followRestriction fl) " \
+              "AND l.name NOT IN (SELECT DISTINCT(n.name) FROM not_valid_user n) " \
+              "ORDER BY p.crawling_order LIMIT {};"\
             .format(target_profile, users_num)
         cur.execute(sql)
         return [dict(row)['name'] for row in cur.fetchall()]
